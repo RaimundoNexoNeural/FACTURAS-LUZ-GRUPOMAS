@@ -11,6 +11,10 @@ USER = "pfombellav@somosgrupomas.com"
 PASSWORD = "Guillena2024*" 
 GRUPO_EMPRESARIAL = "GRUPO HERMANOS MARTIN" # Constante para el texto de búsqueda
 
+# Datos de Filtro para la prueba (Formato DD/MM/YYYY)
+FECHA_DESDE = "01/10/2025" 
+FECHA_HASTA = "31/10/2025" 
+
 # Selector que aparece SÓLO después de un login exitoso (El botón de cookies)
 SUCCESS_INDICATOR_SELECTOR = '#truste-consent-button' 
 
@@ -70,13 +74,14 @@ async def _aceptar_cookies(page: Page):
         print(f"Error al intentar aceptar las cookies: {e}")
 
 
-async def realizar_busqueda_facturas(page: Page, grupo_empresarial: str):
+async def realizar_busqueda_facturas(page: Page, grupo_empresarial: str, fecha_desde: str, fecha_hasta: str):
     """
-    Navega al asistente de búsqueda y aplica el filtro del grupo empresarial.
+    Navega al asistente de búsqueda y aplica el filtro del grupo empresarial, el rango de fechas
+    y ajusta el límite de resultados antes de iniciar la búsqueda.
     """
     print(f"\n--- INICIO DE BÚSQUEDA DE FACTURAS para {grupo_empresarial} ---")
     
-    # 1. Navegar a la página de búsqueda (CORRECCIÓN: Se relaja la espera a domcontentloaded)
+    # 1. Navegar a la página de búsqueda
     await page.goto(URL_BUSQUEDA_FACTURAS, wait_until="domcontentloaded")
     print("Navegación al asistente de búsqueda completada.")
 
@@ -85,33 +90,66 @@ async def realizar_busqueda_facturas(page: Page, grupo_empresarial: str):
     await page.wait_for_selector(main_filter_container_selector, timeout=20000)
     print("Contenedor de filtros detectado. Iniciando interacción...")
 
+    # --- FILTRO 1: GRUPO EMPRESARIAL ---
+
     # 2. Pulsar en el botón 'Grupo empresarial' para abrir el desplegable
-    # Usamos el atributo 'name' en la clase slds-button para ser robustos
     grupo_empresarial_button = 'button[name="periodo"]:has-text("Grupo empresarial")'
     await page.wait_for_selector(grupo_empresarial_button, timeout=15000)
     await page.click(grupo_empresarial_button)
     print("Click en el botón 'Grupo empresarial'.")
 
     # 3. Rellenar el campo de búsqueda con el texto
-    # El input tiene un placeholder 'Buscar'
     input_selector = 'input[placeholder="Buscar"]'
     await page.wait_for_selector(input_selector, timeout=10000)
     await page.fill(input_selector, grupo_empresarial)
     print(f"Texto introducido: '{grupo_empresarial}'.")
 
     # 4. Seleccionar la opción de la lista desplegable
-    # La opción aparece en un <li> y el span contiene el texto exacto.
     opcion_selector = f'span[role="option"] >> text="{grupo_empresarial}"'
-    
-    # Esperamos un breve tiempo a que la lista se filtre (500ms es una estimación)
     await page.wait_for_timeout(500) 
-
-    # Esperamos y hacemos clic en la opción que contiene el nombre del grupo
     await page.wait_for_selector(opcion_selector, timeout=10000)
     await page.click(opcion_selector)
     print(f"Seleccionado '{grupo_empresarial}' en el desplegable.")
+
+    # --- FILTRO 2: FECHA DE EMISIÓN (DESDE / HASTA) ---
+    print("\nAplicando filtros de Fecha de Emisión...")
     
-    # 5. Esperar a que la búsqueda se aplique y cargue el listado (listado de facturas)
+    # Usamos get_by_label() y nth(1) para apuntar al segundo par 'Desde/Hasta'
+    selector_fecha_desde = page.get_by_label("Desde", exact=True).nth(1)
+    selector_fecha_hasta = page.get_by_label("Hasta", exact=True).nth(1)
+
+    # 5. Rellenar campos de fecha
+    await selector_fecha_desde.wait_for(timeout=10000)
+    await selector_fecha_desde.fill(fecha_desde)
+    print(f"Fecha Desde (Emisión) establecida a: {fecha_desde}")
+    
+    await selector_fecha_hasta.fill(fecha_hasta)
+    print(f"Fecha Hasta (Emisión) establecida a: {fecha_hasta}")
+
+    # --- TAREA NUEVA: AJUSTAR LÍMITE DE RESULTADOS ---
+    print("\nAjustando límite de resultados...")
+    # 6. Ajustar el valor del slider (input[type="range"]) a 250
+    # CORRECCIÓN: Usamos get_by_label para apuntar directamente al input del slider por su etiqueta.
+    slider_input = page.get_by_label("Limite")
+    
+    # Usamos una espera previa en el slider_input para mayor fiabilidad, ya que falló en la anterior prueba.
+    await slider_input.wait_for(timeout=10000) 
+    # Playwright usa .fill() para establecer el valor del slider.
+    await slider_input.fill("250")
+    print("Límite de resultados establecido a 250.")
+    
+    # --- TAREA NUEVA: CLIC EN BOTÓN BUSCAR ---
+    
+    # 7. Pulsar el botón de 'Buscar'
+    # Este es el botón final que inicia la consulta después de aplicar los filtros.
+    buscar_button_selector = 'button.slds-button_brand:has-text("Buscar")'
+    
+    # Esperamos a que el botón de Filtrar/Buscar se estabilice antes de hacer clic
+    await page.wait_for_selector(buscar_button_selector, timeout=10000)
+    await page.click(buscar_button_selector)
+    print("Click en el botón 'Buscar'.")
+    
+    # 8. Esperar a que la búsqueda se aplique y cargue el listado (listado de facturas)
     # Pendiente de Tarea 2: Selector del Listado de Facturas
     print("Filtro aplicado. Esperando la carga del listado de facturas...")
     # await page.wait_for_selector("AQUÍ_VA_EL_SELECTOR_DEL_LISTADO", timeout=20000)
@@ -140,8 +178,8 @@ async def ejecutar_robot():
         # 2. Manejo de Cookies (Aparece inmediatamente después del login)
         await _aceptar_cookies(page)
         
-        # 3. Navegación y Búsqueda (Filtro por Grupo Empresarial)
-        await realizar_busqueda_facturas(page, GRUPO_EMPRESARIAL)
+        # 3. Navegación y Búsqueda (Filtro por Grupo Empresarial y Fechas)
+        await realizar_busqueda_facturas(page, GRUPO_EMPRESARIAL, FECHA_DESDE, FECHA_HASTA)
         
         # 4. Descarga de Facturas (Lógica de Tarea 3 pendiente de selectores)
         # facturas_descargadas = await descargar_facturas(page) 
@@ -162,6 +200,7 @@ async def ejecutar_robot():
 if __name__ == "__main__":
     print("--- INICIO DE PRUEBA MANUAL DEL ROBOT ENDESA (ORQUESTACIÓN) ---")
     
+
     try:
         # Ejecutamos la función principal asíncrona
         facturas = asyncio.run(ejecutar_robot())
