@@ -1,9 +1,13 @@
 from fastapi import FastAPI, HTTPException
-from typing import List
+from typing import List, Dict, Any
 from modelos_datos import FacturaEndesaCliente
-from robotEndesa import ejecutar_robot_api
+# Importamos la función ASÍNCRONA para la extracción de datos
+from robotEndesa import ejecutar_robot_api 
+# Importamos la función SÍNCRONA para la lectura de PDF local
+from robotEndesa import obtener_pdf_local_base64 
 import asyncio
 import re
+import os # Necesario para manejar FileNotFoundError
 
 # Inicializar la aplicación de FastAPI
 app = FastAPI(
@@ -11,10 +15,10 @@ app = FastAPI(
     description="API que automatiza la búsqueda y extracción de datos detallados de facturas de Endesa."
 )
 
+# --- Funciones de Validación ---
+
 def validar_cups(cups: str):
     """Simple validación de formato de CUPS (ajustar según sea necesario)."""
-    # Patrón corregido: ES (2 chars) seguido de 20 caracteres alfanuméricos (total 22 chars),
-    # que coincide con el CUPS de ejemplo.
     cups_pattern = r'^ES[A-Z0-9]{20}$' 
     if not re.match(cups_pattern, cups):
         raise HTTPException(
@@ -30,6 +34,8 @@ def validar_fecha(fecha: str):
             status_code=400, 
             detail="El formato de fecha es inválido. Use DD/MM/YYYY (ej: 01/10/2025)."
         )
+
+# --- Endpoint de Extracción de Metadatos ---
 
 @app.get("/")
 def read_root():
@@ -47,12 +53,9 @@ async def get_facturas(
     fecha_hasta: str  # Formato DD/MM/YYYY
 ):
     """
-    Realiza el proceso completo de Login -> Búsqueda -> Descarga -> Extracción XML 
-    usando Playwright. Los datos son devueltos en formato JSON.
-
-    - **cups**: Código CUPS (ej: ES0034111300275021NX0F).
-    - **fecha_desde**: Fecha de inicio de emisión (DD/MM/YYYY, ej: 01/10/2025).
-    - **fecha_hasta**: Fecha de fin de emisión (DD/MM/YYYY, ej: 31/10/2025).
+    Realiza el proceso completo de Login -> Búsqueda -> Descarga -> Extracción XML.
+    Devuelve una lista de objetos FacturaEndesaCliente con el campo 'descarga_selector' 
+    que se usará para la descarga de PDF local.
     """
     
     # Validaciones iniciales
@@ -60,10 +63,9 @@ async def get_facturas(
     validar_fecha(fecha_desde)
     validar_fecha(fecha_hasta)
     
-    print(f"API llamada: CUPS={cups}, Desde={fecha_desde}, Hasta={fecha_hasta}")
+    print(f"API llamada (Metadata): CUPS={cups}, Desde={fecha_desde}, Hasta={fecha_hasta}")
     
     try:
-        # 1. Ejecución del robot asíncrono
         facturas = await ejecutar_robot_api(
             cups=cups, 
             fecha_desde=fecha_desde, 
@@ -71,21 +73,66 @@ async def get_facturas(
         )
 
         if not facturas:
-             # Si no hay facturas, devolvemos una lista JSON vacía (código 200)
              print(f"Advertencia: No se encontraron facturas para el CUPS {cups} en el rango.")
              return []
 
-        print(f"ÉXITO: {len(facturas)} facturas extraídas.")
-        # FastAPI automáticamente convierte List[FacturaEndesaCliente] a JSON
+        print(f"ÉXITO (Metadata): {len(facturas)} facturas extraídas.")
         return facturas
 
     except HTTPException:
-        # Re-lanza las excepciones HTTP ya definidas (ej. 400 por validación)
         raise
         
     except Exception as e:
-        # Manejo de errores críticos del robot (ej. fallo de login, fallo de Playwright)
         error_msg = f"Fallo crítico en el proceso RPA para CUPS {cups}: {e}"
         print(f"ERROR: {error_msg}")
-        # Lanza un error 500 para el cliente
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
+# --- NUEVO Endpoint de Lectura de PDF Local ---
+
+@app.get(
+    "/pdf-local/{cups}/{numero_factura}",
+    response_model=Dict[str, Any], # Devolvemos un diccionario que incluye el Base64
+    summary="Accede y codifica un PDF previamente descargado del servidor."
+)
+def get_pdf_local(
+    cups: str,
+    numero_factura: str,
+):
+    """
+    Lee el PDF del disco local (temp_endesa_downloads/Facturas_Endesa_PDFs/) 
+    usando el CUPS y el número de factura.
+
+    - **cups**: Código CUPS.
+    - **numero_factura**: Número de factura (ej: P25CON050642974).
+
+    Devuelve un JSON con el contenido del PDF codificado en Base64 bajo la clave 'pdf_base64'.
+    """
+    
+    # Validación básica de los parámetros entrantes
+    if not numero_factura:
+         raise HTTPException(status_code=400, detail="Falta el parámetro 'numero_factura'.")
+    validar_cups(cups)
+    
+    print(f"API llamada (PDF Local): CUPS={cups}, Factura={numero_factura}")
+    
+    try:
+        # Llamamos a la función síncrona de acceso a disco local
+        # No necesitamos la descarga_selector ya que el archivo está en el disco.
+        pdf_data = obtener_pdf_local_base64(
+            cups=cups,
+            numero_factura=numero_factura,
+        )
+        
+        print(f"ÉXITO (PDF Local): PDF para {numero_factura} codificado.")
+        return pdf_data
+        
+    except FileNotFoundError as e:
+        error_msg = f"Archivo no encontrado. Asegúrese de que la factura se haya extraído previamente. Detalle: {e}"
+        print(f"ERROR: {error_msg}")
+        raise HTTPException(status_code=404, detail=error_msg)
+        
+    except Exception as e:
+        error_msg = f"Fallo crítico al leer el PDF para {numero_factura}: {e}"
+        print(f"ERROR: {error_msg}")
         raise HTTPException(status_code=500, detail=error_msg)

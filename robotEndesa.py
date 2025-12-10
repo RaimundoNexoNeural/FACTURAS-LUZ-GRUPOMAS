@@ -2,6 +2,7 @@ from navegador import NavegadorAsync, TEMP_DOWNLOAD_ROOT # Importamos la clase b
 import asyncio
 import re
 import csv # Necesario para exportar los logs
+import base64 # Necesario para la codificación Base64
 import os # Necesario para manejar rutas de archivos
 from playwright.async_api import Page, TimeoutError, Locator # Importamos Page, TimeoutError, Locator
 from modelos_datos import FacturaEndesaCliente # Importamos la clase modelo de datos (AHORA ES PYDANTIC)
@@ -457,6 +458,41 @@ async def ejecutar_robot_api(cups: str, fecha_desde: str, fecha_hasta: str) -> l
         else:
              print("\nEl navegador ya está cerrado.")
 
+# --------------------------------------------------------------------------------
+# --- NUEVA FUNCIÓN PARA LA SEGUNDA LLAMADA API (ACCESO A PDF LOCAL - SÍNCRONA) ---
+# --------------------------------------------------------------------------------
+
+def obtener_pdf_local_base64(cups: str, numero_factura: str) -> dict:
+    """
+    Lee un archivo PDF previamente descargado del disco local (sin RPA), 
+    lo codifica en Base64 y devuelve su contenido.
+    
+    Esta función es SÍNCRONA, adecuada para lectura de archivos.
+    """
+    target_folder = DOWNLOAD_FOLDERS['PDF']
+    filename = f"{cups}_{numero_factura}.pdf"
+    file_path = os.path.join(target_folder, filename)
+    
+    if not os.path.exists(file_path):
+        # Lanza un error que será capturado por el endpoint de FastAPI
+        raise FileNotFoundError(f"El archivo no existe en la ruta esperada: {file_path}")
+
+    # 1. Leer el PDF binario
+    with open(file_path, 'rb') as pdf_file:
+        pdf_data = pdf_file.read()
+    
+    # 2. Codificar en Base64
+    pdf_base64_encoded = base64.b64encode(pdf_data).decode('utf-8')
+    
+    print(f"✅ PDF '{filename}' leído y codificado en Base64. Tamaño: {len(pdf_base64_encoded)//1024} KB.")
+
+    # 3. Devolver el contenido y metadatos
+    return {
+        "filename": filename,
+        "cups": cups,
+        "numero_factura": numero_factura,
+        "pdf_base64": pdf_base64_encoded,
+    }
 
 # --- FUNCIÓN DE PRUEBA Y EJECUCIÓN MANUAL ---
 # ELIMINAMOS LA LÓGICA DE EJECUCIÓN MANUAL PARA EVITAR CONFLICTOS CON UVICORN
