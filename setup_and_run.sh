@@ -1,101 +1,71 @@
 #!/bin/bash
 # filepath: setup_and_run.sh
-
-# Salir inmediatamente si un comando falla
 set -e
 
-# --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
+# --- CONFIGURACIÓN ---
 PROJECT_DIR=$(pwd)
 REQUIREMENTS_FILE="requirements.txt"
 VENV_DIR="venv"
 API_MODULE="api:app"
-UVICORN_HOST="0.0.0.0" # Escucha en todas las interfaces (IP pública)
-UVICORN_PORT="9999" # Puerto solicitado
-
-# Usamos python3, que es 3.11.2.
+UVICORN_HOST="0.0.0.0"
+UVICORN_PORT="9999"
 PYTHON_BIN="python3"
 
-# -----------------------------------------------
-
-echo "======================================================="
-echo " INICIANDO CONFIGURACIÓN Y ARRANQUE DE LA API "
-echo "======================================================="
-
-# 1. Verificación de Requisitos e Instalación de Utilidades Básicas
-echo "1. Instalando paquetes básicos del sistema (python3-venv, lsof, etc.)..."
-if [ ! -f "$REQUIREMENTS_FILE" ] || [ ! -f "api.py" ]; then
-    echo " ERROR: Asegúrate de ejecutar este script desde el directorio raíz del proyecto."
+# 🛡️ SEGURIDAD: Verificar credenciales
+if [ -z "$ENDESA_USER" ] || [ -z "$ENDESA_PASSWORD" ]; then
+    echo "❌ ERROR: Credenciales no detectadas en el entorno."
+    echo "Uso: ENDESA_USER=usuario ENDESA_PASSWORD=clave ./setup_and_run.sh"
     exit 1
 fi
 
-# Instala paquetes de sistema que son estrictamente necesarios para el entorno.
-sudo apt update
-sudo apt install python3-venv python3-pip lsof -y
+echo "======================================================="
+echo " 🚀 INICIANDO CONFIGURACIÓN Y ARRANQUE DE LA API 🚀 "
+echo "======================================================="
 
+# 1. Utilidades básicas
+sudo apt update && sudo apt install python3-venv python3-pip lsof -y
 
-# 2. Crear y Activar Entorno Virtual
-echo ""
-echo "2.  Configurando entorno virtual '$VENV_DIR'..."
+# 2. Entorno Virtual
 if [ ! -d "$VENV_DIR" ]; then
     $PYTHON_BIN -m venv $VENV_DIR
 fi
-
-# Activación del entorno
-echo "   Activando entorno virtual..."
 source $VENV_DIR/bin/activate
 
-# 3. Instalar Dependencias de Python (Incluye Playwright)
-echo "3. Instalando dependencias de Python desde $REQUIREMENTS_FILE (incluyendo Playwright)..."
+# 3. Dependencias
 pip install --upgrade pip
-# Esto instala la librería 'playwright' en el venv.
 pip install -r $REQUIREMENTS_FILE
 
-
-# 4. Instalación de Dependencias del Sistema (Librerías de Linux para Playwright)
-echo ""
-echo "4.  Instalando dependencias del sistema para el navegador (requiere sudo)..."
-#  CORRECCIÓN: Usamos la ruta completa del binario dentro del VENV.
+# 4. Playwright
 sudo ./$VENV_DIR/bin/playwright install-deps
-
-
-# 5. Configurar e Instalar Navegador de Playwright
-echo "5.  Instalando el binario del navegador Chromium..."
-# Instala el binario del navegador (Chromium) en el cache local de Playwright.
 playwright install chromium
 
+# 5. Directorios
+mkdir -p logs csv temp_endesa_downloads/Facturas_Endesa_PDFs temp_endesa_downloads/Facturas_Endesa_XMLs temp_endesa_downloads/Facturas_Endesa_HTMLs
 
-# 6. Preparación de Directorios de Trabajo
-echo "6.  Creando directorios de logs y descargas si no existen..."
-mkdir -p logs
-mkdir -p csv
-mkdir -p temp_endesa_downloads/Facturas_Endesa_PDFs
-mkdir -p temp_endesa_downloads/Facturas_Endesa_XMLs
-
-
-# 7. Desplegar la API con Uvicorn (Persistencia con nohup)
-echo ""
-echo "7.  Desplegando la API en http://$UVICORN_HOST:$UVICORN_PORT en segundo plano (nohup)..."
-
-# A. Detener procesos anteriores que usen el puerto
-echo "   Deteniendo procesos anteriores en el puerto $UVICORN_PORT..."
+# 6. Limpieza de puerto
 PID=$(lsof -t -i :$UVICORN_PORT)
 if [ ! -z "$PID" ]; then
     kill -9 "$PID"
-    echo "   Proceso Uvicorn anterior (PID $PID) detenido."
+    echo "   Proceso anterior en puerto $UVICORN_PORT detenido."
 fi
 
-# B. Ejecución con nohup y variables de entorno
+# 7. Lanzamiento con verificación (Workers reducidos a 2 para estabilidad)
+echo "🚀 Lanzando Uvicorn en segundo plano..."
 nohup env ENDESA_USER="$ENDESA_USER" ENDESA_PASSWORD="$ENDESA_PASSWORD" \
-      uvicorn $API_MODULE --host $UVICORN_HOST --port $UVICORN_PORT --workers 4 --proxy-headers > api_output.log 2>&1 &
+      uvicorn $API_MODULE --host $UVICORN_HOST --port $UVICORN_PORT --workers 2 --proxy-headers > api_output.log 2>&1 &
 
-# C. Guardar el PID para la gestión posterior
+# Guardar el PID
 echo $! > api_server.pid
 
-echo " CONFIGURACIÓN Y ARRANQUE COMPLETADO."
-echo "La API se está ejecutando en segundo plano en http://[IP_PUBLICA]:$UVICORN_PORT."
-echo "PID: $(<api_server.pid)"
-echo "Revisa 'api_output.log' para la salida de Uvicorn."
-echo "======================================================="
+# Pequeña espera para confirmar que no se cierra
+sleep 2
+if ps -p $(cat api_server.pid) > /dev/null; then
+    echo "✅ API ARRANCADA CON ÉXITO."
+    echo "URL: http://93.93.64.20:9999/docs"
+    echo "PID: $(cat api_server.pid)"
+else
+    echo "❌ ERROR: La API se cerró tras el arranque. Revisa api_output.log"
+    exit 1
+fi
 
-# Desactivar el entorno virtual
 deactivate
