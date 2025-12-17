@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from typing import List, Dict, Any
 from modelos_datos import FacturaEndesaCliente
 # Importamos la función ASÍNCRONA para la extracción de datos
@@ -115,94 +115,73 @@ async def clear_files():
 @app.get(
     "/facturas", 
     response_model=List[FacturaEndesaCliente],
-    summary="Busca y extrae los datos de facturas para un CUPS en un rango de fechas."
+    summary="Busca y extrae los datos de facturas para un listado de CUPS en un rango de fechas."
 )
 async def get_facturas(
-    cups: str, 
     fecha_desde: str, # Formato DD/MM/YYYY
-    fecha_hasta: str  # Formato DD/MM/YYYY
+    fecha_hasta: str,  # Formato DD/MM/YYYY
+    cups: List[str] = Query(..., description="Lista de códigos CUPS a procesar.")
+    
 ):
     """
     Realiza el proceso completo de Login -> Búsqueda -> Descarga -> Extracción XML.
     Devuelve una lista de objetos FacturaEndesaCliente con el campo 'descarga_selector' 
     que se usará para la descarga de PDF local.
     """
-    
+
+    escribir_log(f"\nAPI llamada (Metadata): {len(cups)} CUPs, Desde={fecha_desde}, Hasta={fecha_hasta}\n",pretexto="\n")
     # Validaciones iniciales
-    validar_cups(cups)
     validar_fecha(fecha_desde)
     validar_fecha(fecha_hasta)
+    for c in cups:
+        validar_cups(c)
+        escribir_log(f"- CUPS válido: {c}",mostrar_tiempo=False)
 
-    escribir_log(f"\nAPI llamada (Metadata): CUPS={cups}, Desde={fecha_desde}, Hasta={fecha_hasta}\n",pretexto="")
+    #escribir_log(f"\nAPI llamada (Metadata): CUPS={cups}, Desde={fecha_desde}, Hasta={fecha_hasta}\n",pretexto="")
 
     try:
         facturas = await ejecutar_robot_api(
-            cups=cups, 
+            lista_cups=cups, 
             fecha_desde=fecha_desde, 
             fecha_hasta=fecha_hasta
         )
 
-        if not facturas:
-             escribir_log(f"Advertencia: No se encontraron facturas para el CUPS {cups} en el rango.")
-             return []
-
-        escribir_log(f"ÉXITO (Metadata): {len(facturas)} facturas extraídas.")
+        escribir_log(f"\n[API] ÉXITO (Metadata): {len(facturas)} facturas extraídas.\n\n",pretexto="")
         return facturas
 
     except HTTPException:
         raise
         
     except Exception as e:
-        error_msg = f"Fallo crítico en el proceso RPA para CUPS {cups}: {e}"
+        error_msg = f"Fallo crítico en el proceso RPA: {e}"
         escribir_log(f"ERROR: {error_msg}")
         raise HTTPException(status_code=500, detail=error_msg)
 
 
 # --- Endpoint de Lectura de PDF Local ---
-
 @app.get(
     "/pdf-local/{cups}/{numero_factura}",
-    response_model=Dict[str, Any], # Devolvemos un diccionario que incluye el Base64
-    summary="Accede y codifica un PDF previamente descargado del servidor."
+    response_model=Dict[str, Any],
+    summary="Accede al PDF local (siempre devuelve respuesta exitosa)."
 )
 def get_pdf_local(
     cups: str,
     numero_factura: str,
 ):
     """
-    Lee el PDF del disco local (temp_endesa_downloads/Facturas_Endesa_PDFs/) 
-    usando el CUPS y el número de factura.
-
-    - **cups**: Código CUPS.
-    - **numero_factura**: Número de factura (ej: P25CON050642974).
-
-    Devuelve un JSON con el contenido del PDF codificado en Base64 bajo la clave 'pdf_base64'.
+    Endpoint robusto para la obtención de PDF. 
+    Incluso si el archivo no existe, devuelve un JSON válido con un mensaje de error 
+    dentro del campo 'pdf_base64'.
     """
-    
-    # Validación básica de los parámetros entrantes
-    if not numero_factura:
-         raise HTTPException(status_code=400, detail="Falta el parámetro 'numero_factura'.")
+    # Mantenemos solo la validación de formato CUPS por integridad de datos
     validar_cups(cups)
     
-    escribir_log(f"\nAPI llamada (PDF Local): CUPS={cups}, Factura={numero_factura}\n",pretexto="")
+    escribir_log(f"API llamada (PDF Local): CUPS={cups}, Factura={numero_factura}", pretexto="")
     
-    try:
-        # Llamamos a la función síncrona de acceso a disco local
-        # No necesitamos la descarga_selector ya que el archivo está en el disco.
-        pdf_data = obtener_pdf_local_base64(
-            cups=cups,
-            numero_factura=numero_factura,
-        )
+    # La función obtener_pdf_local_base64 ya gestiona internamente los archivos inexistentes
+    resultado = obtener_pdf_local_base64(
+        cups=cups,
+        numero_factura=numero_factura,
+    )
 
-        escribir_log(f"ÉXITO (PDF Local): PDF para {numero_factura} codificado.")
-        return pdf_data
-        
-    except FileNotFoundError as e:
-        error_msg = f"Archivo no encontrado. Asegúrese de que la factura se haya extraído previamente. Detalle: {e}"
-        escribir_log(f"ERROR: {error_msg}")
-        raise HTTPException(status_code=404, detail=error_msg)
-        
-    except Exception as e:
-        error_msg = f"Fallo crítico al leer el PDF para {numero_factura}: {e}"
-        escribir_log(f"ERROR: {error_msg}")
-        raise HTTPException(status_code=500, detail=error_msg)
+    return resultado

@@ -2,6 +2,7 @@ import re
 import os
 from datetime import datetime
 from modelos_datos import FacturaEndesaCliente 
+from logs import escribir_log
 
 # --------------------------------------------------------------------------------
 # --- FUNCIONES AUXILIARES PARA LECTURA POR REGEX ---
@@ -32,7 +33,6 @@ def _extract_simple_value(file_content: str, tag_name: str, is_float: bool = Fal
         return value
     
     return default if default is not None else (0.0 if is_float else None)
-
 
 def _extract_cost_by_description(file_content: str, item_description: str) -> float:
     """
@@ -74,10 +74,10 @@ def procesar_xml_local(factura: FacturaEndesaCliente, filepath: str):
             content = _clean_text(raw_content) # Eliminamos NS para facilitar el Regex
             
     except FileNotFoundError:
-        print(f"   -> [ERROR XML] Archivo no encontrado en: {filepath}")
+        escribir_log(f"    -> [ERROR XML] Archivo no encontrado en: {filepath}")
         return
     except Exception as e:
-        print(f"   -> [ERROR XML] Error al leer el archivo (código): {e}")
+        escribir_log(f"     -> [ERROR XML] Error al leer el archivo (código): {e}")
         return
 
     # --- INICIALIZACIÓN DE VARIABLES PARA CÁLCULO ---
@@ -91,14 +91,24 @@ def procesar_xml_local(factura: FacturaEndesaCliente, filepath: str):
     factura.tarifa = _extract_simple_value(content, 'CodigoTarifa', default='N/A')
     factura.direccion_suministro = _extract_simple_value(content, 'Direccion', default='N/A')
     
-    # Mes Facturado (de TransactionDate)
+   # Mes Facturado (de TransactionDate) convertido a NOMBRE EN MAYÚSCULAS
     transaction_date = _extract_simple_value(content, 'TransactionDate')
     if transaction_date:
         try:
+            # Diccionario de traducción
+            nombres_meses = {
+                1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL",
+                5: "MAYO", 6: "JUNIO", 7: "JULIO", 8: "AGOSTO",
+                9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"
+            }
+            
             dt = datetime.strptime(transaction_date, '%Y-%m-%d')
-            factura.mes_facturado = dt.strftime('%Y-%m')
+            # Extraemos el número del mes (1-12) y obtenemos su nombre del diccionario
+            factura.mes_facturado = nombres_meses.get(dt.month, "DESCONOCIDO")
+            
         except ValueError:
-            pass # Se queda en None
+            escribir_log(f"    -> [ADVERTENCIA XML] No se pudo parsear la fecha: {transaction_date}")
+            pass # Se mantiene como None según tu lógica original
     
     # Base Imponible: <TotalGrossAmountBeforeTaxes>
     factura.importe_base_imponible = _extract_simple_value(content, 'TotalGrossAmountBeforeTaxes', is_float=True)
@@ -192,4 +202,4 @@ def procesar_xml_local(factura: FacturaEndesaCliente, filepath: str):
         pass
 
 
-    print(f"   -> [PARSE XML/REGEX] Éxito. Base Imponible: {factura.importe_base_imponible}, Consumo Total: {factura.kw_totales}")
+    escribir_log(f"    -> [OK] [XML PARSED] Datos extraídos del XML para factura {factura.numero_factura} ({factura.cups})")
