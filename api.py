@@ -22,11 +22,11 @@ app = FastAPI(
 
 def validar_cups(cups: str):
     """Simple validación de formato de CUPS (ajustar según sea necesario)."""
-    cups_pattern = r'^ES[A-Z0-9]{20}$' 
+    cups_pattern = r'^ES[A-Z0-9]{16,20}$'  # Ejemplo: ES seguido de 16-20 caracteres alfanuméricos
     if not re.match(cups_pattern, cups):
         raise HTTPException(
             status_code=400, 
-            detail=f"El formato del código CUPS '{cups}' es inválido. Debe seguir el patrón ESXX... y tener 22 caracteres."
+            detail=f"El formato del código CUPS '{cups}' es inválido. Debe seguir el patrón ESXX... y tener 16-20 caracteres."
         )
 
 def validar_fecha(fecha: str):
