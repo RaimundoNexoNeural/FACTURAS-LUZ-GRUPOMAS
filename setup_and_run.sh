@@ -1,10 +1,7 @@
 #!/bin/bash
 # filepath: setup_and_run.sh
 
-# Salir inmediatamente si un comando falla
-set -e
-
-# --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
+# --- CONFIGURACIÓN Y VARIABLES ---
 PROJECT_DIR=$(pwd)
 REQUIREMENTS_FILE="requirements.txt"
 VENV_DIR="venv"
@@ -13,65 +10,67 @@ UVICORN_HOST="0.0.0.0"
 UVICORN_PORT="9999"
 PYTHON_BIN="python3"
 
-# -----------------------------------------------
-
 echo "======================================================="
-echo " INICIANDO CONFIGURACIÓN Y ARRANQUE DE LA API "
+echo " 🚀 CONFIGURACIÓN COMPLETA Y ARRANQUE DE LA API 🚀 "
 echo "======================================================="
 
-# --- VALIDACIÓN DE CREDENCIALES ---
+# 1. Validación de Credenciales
 if [ -z "$ENDESA_USER" ] || [ -z "$ENDESA_PASSWORD" ]; then
-    echo " ERROR: Credenciales no detectadas. Pásalas al ejecutar el script."
+    echo " ❌ ERROR: Credenciales no detectadas. Abortando."
     exit 1
 fi
 
-# 1. Instalación de Utilidades Básicas
-echo "1. Verificando paquetes del sistema (venv, lsof)..."
-sudo apt update
-sudo apt install python3-venv python3-pip lsof -y
+# 2. Instalación de paquetes del sistema (sudo)
+echo "1. Verificando paquetes base (venv, lsof)..."
+sudo apt update && sudo apt install -y python3-venv python3-pip lsof
 
-# 2. Configurar Entorno Virtual
+# 3. Preparación del Entorno Virtual
 echo "2. Configurando entorno virtual..."
 if [ ! -d "$VENV_DIR" ]; then
     $PYTHON_BIN -m venv $VENV_DIR
 fi
-
-# Activación
 source $VENV_DIR/bin/activate
 
-# 3. Instalar Dependencias
-echo "3. Instalando dependencias de Python..."
+# 4. Instalación de Dependencias de Python
+echo "3. Instalando librerías de Python..."
 pip install --upgrade pip
 pip install -r $REQUIREMENTS_FILE
 
-# 4. Configuración de Playwright
-echo "4. Instalando dependencias del navegador..."
+# 5. Configuración de Playwright (Navegadores y Dependencias)
+echo "4. Configurando Playwright y Chromium..."
+# Instalamos las librerías de sistema necesarias para Chromium
 sudo ./$VENV_DIR/bin/playwright install-deps
+# Instalamos el binario de Chromium
 playwright install chromium
 
-# 5. Preparación de Directorios
-echo "5. Creando directorios de trabajo..."
-mkdir -p logs csv temp_endesa_downloads/Facturas_Endesa_PDFs temp_endesa_downloads/Facturas_Endesa_XMLs temp_endesa_downloads/Facturas_Endesa_HTMLs
+# 6. Preparación de Carpetas
+echo "5. Creando directorios de logs y descargas..."
+mkdir -p logs csv temp_endesa_downloads/Facturas_Endesa_PDFs temp_endesa_downloads/Facturas_Endesa_XMLs
 
-# 6. Limpieza de Procesos Previos
-echo "6. Deteniendo procesos en puerto $UVICORN_PORT..."
-PID=$(lsof -t -i :$UVICORN_PORT)
-if [ ! -z "$PID" ]; then
-    kill -9 "$PID"
-    echo "   PID $PID terminado."
+# 7. Limpieza de Procesos (Método Seguro)
+echo "6. Limpiando puerto $UVICORN_PORT..."
+CURRENT_PID=$(lsof -t -i :$UVICORN_PORT 2>/dev/null || true)
+if [ ! -z "$CURRENT_PID" ]; then
+    echo "   Deteniendo proceso anterior (PID: $CURRENT_PID)..."
+    kill -9 $CURRENT_PID 2>/dev/null || true
+    sleep 2
 fi
 
-# 7. Lanzamiento de la API (Versión de 1 solo Worker para n8n)
+# 8. Lanzamiento Persistente
 echo "7. Desplegando API en segundo plano..."
-nohup env ENDESA_USER="$ENDESA_USER" ENDESA_PASSWORD="$ENDESA_PASSWORD" \
-      uvicorn $API_MODULE --host $UVICORN_HOST --port $UVICORN_PORT > api_output.log 2>&1 &
+# Usamos python3 -m uvicorn para máxima compatibilidad con el venv
+nohup python3 -m uvicorn $API_MODULE --host $UVICORN_HOST --port $UVICORN_PORT > api_output.log 2>&1 &
 
-# Guardar el PID
-echo $! > api_server.pid
+# Guardar el PID y desvincular
+NEW_PID=$!
+echo $NEW_PID > api_server.pid
+disown $NEW_PID
+
 
 echo "======================================================="
-echo " CONFIGURACIÓN COMPLETADA."
-echo " PID: $(cat api_server.pid)"
+echo " ✅ PROCESO FINALIZADO CON ÉXITO "
+echo " PID ACTUAL: $NEW_PID"
+echo " URL: http://93.93.64.20:9999/docs"
 echo "======================================================="
 
 deactivate
