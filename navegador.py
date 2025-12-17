@@ -1,6 +1,6 @@
-from playwright.async_api import async_playwright, Playwright, Browser, Page, BrowserContext # Importamos las clases para mejor tipado
-import asyncio # Necesario para ejecutar funciones asíncronas
-import os # Necesario para gestionar directorios
+from playwright.async_api import async_playwright, Playwright, Browser, Page, BrowserContext
+import asyncio
+import os
 
 # Directorio raíz donde Playwright guardará temporalmente los archivos.
 TEMP_DOWNLOAD_ROOT = "temp_endesa_downloads" 
@@ -23,41 +23,43 @@ class NavegadorAsync:
         """Inicializa la sesión de Playwright y lanza el navegador."""
         self.playwright = await async_playwright().start()
         
-        # En preproducción usamos headless=False (visual)
+        # Mantenemos headless=True para el servidor
         self.browser = await self.playwright.chromium.launch(headless=True) 
         
-        # Creamos un nuevo contexto de navegador CON el directorio de descarga configurado
+        # --- CAMBIOS PARA EVITAR BLOQUEOS Y MEJORAR ESTABILIDAD ---
         self.context = await self.browser.new_context(
-            accept_downloads=True, # Permitimos descargas
-            # Nota: Playwright usará su propia ubicación temporal, pero al usar save_as, 
-            # podemos definir la ruta absoluta localmente.
+            # 1. User Agent real (Chrome en Windows 10)
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            # 2. Resolución de pantalla estándar
+            viewport={'width': 1920, 'height': 1080},
+            # 3. Idioma aceptado (evita que la web cargue versiones raras)
+            extra_http_headers={
+                "Accept-Language": "es-ES,es;q=0.9"
+            },
+            accept_downloads=True
         )
         self.page = await self.context.new_page()
         
         return self 
 
     async def goto_url(self, url: str, timeout_ms: int = 60000) -> Page:
-        """
-        Navega a la URL especificada. 
-        Retorna el objeto Page para interactuar.
-        """
+        """Navega a la URL especificada."""
         await self.page.goto(
             url, 
-            wait_until="domcontentloaded", 
+            wait_until="networkidle", # Cambiado de domcontentloaded a networkidle
             timeout=timeout_ms
         ) 
         return self.page
 
     async def cerrar(self):
-        """Cierra el navegador y detiene el contexto de Playwright de forma segura."""
+        """Cierra el navegador y detiene el contexto."""
         if self.browser:
             await self.browser.close()
         if self.playwright:
             await self.playwright.stop()
             
-    # Función para obtener la página activa, útil para el robot
     def get_page(self) -> Page:
-        """Devuelve el objeto Page actual para su uso por el robot."""
+        """Devuelve el objeto Page actual."""
         if not self.page:
-            raise RuntimeError("El navegador no ha sido inicializado. Ejecute 'iniciar()' primero.")
+            raise RuntimeError("El navegador no ha sido inicializado.")
         return self.page

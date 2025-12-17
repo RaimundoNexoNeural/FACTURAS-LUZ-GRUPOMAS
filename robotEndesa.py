@@ -276,7 +276,7 @@ async def _iniciar_sesion(page: Page, username: str, password: str) -> bool:
         await page.click(login_button_selector)
         
         # 3. Esperar el indicador de éxito (el botón de cookies) en la nueva página
-        await page.wait_for_selector(SUCCESS_INDICATOR_SELECTOR, timeout=30000)
+        await page.wait_for_selector(SUCCESS_INDICATOR_SELECTOR, timeout=60000)
         
         return True
 
