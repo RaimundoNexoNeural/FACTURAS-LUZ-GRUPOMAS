@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query
 from typing import List, Dict, Any
+from pydantic import BaseModel
 from modelos_datos import FacturaEndesaCliente
 # Importamos la función ASÍNCRONA para la extracción de datos
 from robotEndesa import ejecutar_robot_api 
@@ -36,6 +37,12 @@ def validar_fecha(fecha: str):
             status_code=400, 
             detail="El formato de fecha es inválido. Use DD/MM/YYYY (ej: 01/10/2025)."
         )
+
+# --- Modelos de Datos para Requests y Responses ---
+class FacturaRequest(BaseModel):
+    fecha_desde: str
+    fecha_hasta: str
+    cups: List[str]
 
 # --- Endpoint de Extracción de Metadatos ---
 
@@ -111,7 +118,6 @@ async def clear_files():
     return {"message": "Limpieza de archivos temporales, logs y CSVs completada."}
 
 # --- Endpoint de Extracción de Metadatos ---
-
 @app.get(
     "/facturas", 
     response_model=List[FacturaEndesaCliente],
@@ -157,7 +163,48 @@ async def get_facturas(
         escribir_log(f"ERROR: {error_msg}")
         raise HTTPException(status_code=500, detail=error_msg)
 
+# --- Endpoint de Extracción de Metadatos (POST) ---
+@app.post(
+    "/facturas", 
+    response_model=List[FacturaEndesaCliente],
+    summary="Busca y extrae los datos de facturas mediante POST (para listas largas de CUPS)."
+)
+async def post_facturas(request: FacturaRequest):
+    """
+    Versión POST del endpoint de facturas. 
+    Recibe los parámetros en el cuerpo del mensaje para evitar límites de URL.
+    """
+    # Extraemos los datos del objeto request
+    fecha_desde = request.fecha_desde
+    fecha_hasta = request.fecha_hasta
+    cups = request.cups
 
+    escribir_log(f"\nAPI llamada POST (Metadata): {len(cups)} CUPs, Desde={fecha_desde}, Hasta={fecha_hasta}\n", pretexto="\n")
+    
+    # Validaciones (usando tus funciones existentes)
+    validar_fecha(fecha_desde)
+    validar_fecha(fecha_hasta)
+    for c in cups:
+        validar_cups(c)
+        escribir_log(f"- CUPS válido: {c}", mostrar_tiempo=False)
+
+    try:
+        # Llamamos a la misma función del robot que ya usaba el GET
+        facturas = await ejecutar_robot_api(
+            lista_cups=cups, 
+            fecha_desde=fecha_desde, 
+            fecha_hasta=fecha_hasta
+        )
+
+        escribir_log(f"\n[API] ÉXITO (Metadata): {len(facturas)} facturas extraídas.\n\n", pretexto="")
+        return facturas
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Fallo crítico en el proceso RPA: {e}"
+        escribir_log(f"ERROR: {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
 # --- Endpoint de Lectura de PDF Local ---
 @app.get(
     "/pdf-local/{cups}/{numero_factura}",
