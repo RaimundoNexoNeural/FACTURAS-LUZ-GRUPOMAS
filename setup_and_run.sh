@@ -2,70 +2,71 @@
 # filepath: setup_and_run.sh
 set -e
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACION ---
 PROJECT_DIR=$(pwd)
-REQUIREMENTS_FILE="requirements.txt"
-VENV_DIR="venv"
+VENV_DIR="$PROJECT_DIR/venv"
 API_MODULE="api:app"
 UVICORN_HOST="0.0.0.0"
 UVICORN_PORT="9999"
-PYTHON_BIN="python3"
 
-# 🛡️ SEGURIDAD: Verificar credenciales
+# VERIFICACION DE CREDENCIALES
 if [ -z "$ENDESA_USER" ] || [ -z "$ENDESA_PASSWORD" ]; then
-    echo "❌ ERROR: Credenciales no detectadas en el entorno."
-    echo "Uso: ENDESA_USER=usuario ENDESA_PASSWORD=clave ./setup_and_run.sh"
+    echo "ERROR: Variables de entorno ENDESA_USER o ENDESA_PASSWORD no definidas."
     exit 1
 fi
 
-echo "======================================================="
-echo " 🚀 INICIANDO CONFIGURACIÓN Y ARRANQUE DE LA API 🚀 "
-echo "======================================================="
+echo "Iniciando despliegue de API..."
 
-# 1. Utilidades básicas
+# 1. ACTUALIZACION DE DEPENDENCIAS DE SISTEMA
 sudo apt update && sudo apt install python3-venv python3-pip lsof -y
 
-# 2. Entorno Virtual
+# 2. GESTION DE ENTORNO VIRTUAL
 if [ ! -d "$VENV_DIR" ]; then
-    $PYTHON_BIN -m venv $VENV_DIR
+    python3 -m venv "$VENV_DIR"
 fi
-source $VENV_DIR/bin/activate
 
-# 3. Dependencias
-pip install --upgrade pip
-pip install -r $REQUIREMENTS_FILE
+# 3. INSTALACION DE LIBRERIAS
+"$VENV_DIR/bin/pip" install --upgrade pip
+"$VENV_DIR/bin/pip" install -r requirements.txt
 
-# 4. Playwright
-sudo ./$VENV_DIR/bin/playwright install-deps
-playwright install chromium
+# 4. CONFIGURACION DE PLAYWRIGHT
+sudo "$VENV_DIR/bin/playwright" install-deps
+"$VENV_DIR/bin/playwright" install chromium
 
-# 5. Directorios
+# 5. ESTRUCTURA DE DIRECTORIOS
 mkdir -p logs csv temp_endesa_downloads/Facturas_Endesa_PDFs temp_endesa_downloads/Facturas_Endesa_XMLs temp_endesa_downloads/Facturas_Endesa_HTMLs
 
-# 6. Limpieza de puerto
+# 6. CIERRE DE PROCESOS PREVIOS
 PID=$(lsof -t -i :$UVICORN_PORT)
 if [ ! -z "$PID" ]; then
     kill -9 "$PID"
-    echo "   Proceso anterior en puerto $UVICORN_PORT detenido."
+    echo "Proceso previo en puerto $UVICORN_PORT (PID $PID) finalizado."
 fi
 
-# 7. Lanzamiento con verificación (Workers reducidos a 2 para estabilidad)
-echo "🚀 Lanzando Uvicorn en segundo plano..."
+# 7. EJECUCION EN SEGUNDO PLANO
+# Se utiliza la ruta absoluta al binario de uvicorn para evitar fallos de PATH.
+# Se reduce a 2 workers para optimizar el consumo de recursos en el servidor.
 nohup env ENDESA_USER="$ENDESA_USER" ENDESA_PASSWORD="$ENDESA_PASSWORD" \
-      uvicorn $API_MODULE --host $UVICORN_HOST --port $UVICORN_PORT --workers 2 --proxy-headers > api_output.log 2>&1 &
+    "$VENV_DIR/bin/uvicorn" $API_MODULE \
+    --host $UVICORN_HOST \
+    --port $UVICORN_PORT \
+    --workers 2 \
+    --proxy-headers > api_output.log 2>&1 &
 
-# Guardar el PID
+# REGISTRO DEL PID
 echo $! > api_server.pid
 
-# Pequeña espera para confirmar que no se cierra
-sleep 2
+# 8. VERIFICACION DE ESTABILIDAD
+echo "Verificando estado del proceso..."
+sleep 5
+
 if ps -p $(cat api_server.pid) > /dev/null; then
-    echo "✅ API ARRANCADA CON ÉXITO."
-    echo "URL: http://93.93.64.20:9999/docs"
+    echo "DESPLIEGUE EXITOSO."
+    echo "Endpoint: http://$UVICORN_HOST:$UVICORN_PORT/docs"
     echo "PID: $(cat api_server.pid)"
 else
-    echo "❌ ERROR: La API se cerró tras el arranque. Revisa api_output.log"
+    echo "ERROR: El proceso no se mantuvo estable tras el lanzamiento."
+    echo "Ultimos registros de api_output.log:"
+    tail -n 20 api_output.log
     exit 1
 fi
-
-deactivate
