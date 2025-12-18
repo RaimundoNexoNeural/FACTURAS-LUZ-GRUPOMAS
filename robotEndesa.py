@@ -393,24 +393,38 @@ async def ejecutar_robot_api(lista_cups: list, fecha_desde: str, fecha_hasta: st
                 facturas_cups = await leer_tabla_facturas(page)
                 
                 if facturas_cups:
+                    for f in facturas_cups:
+                        f.error_RPA = False  # Añadiremos este campo al modelo
                     facturas_totales.extend(facturas_cups)
+
                     # Generamos el CSV individual de este CUPS como respaldo
                     log_path = LOG_FILE_NAME_TEMPLATE.format(cups=cups_actual)
                     _exportar_log_csv(facturas_cups, log_path)
                     escribir_log(f"{'='*80}",mostrar_tiempo=False)
                     escribir_log(f"[OK] {len(facturas_cups)} facturas procesadas con éxito para {cups_actual}.")
                     escribir_log(f"{'='*80}",mostrar_tiempo=False)
+                
                 else:
                     escribir_log(f"{'='*80}",mostrar_tiempo=False)
                     escribir_log(f"[INFO] No se encontraron facturas registradas para {cups_actual} en este rango.")
                     escribir_log(f"{'='*80}",mostrar_tiempo=False)
+                    registro_vacio = FacturaEndesaCliente(cups=cups_actual, error_RPA=False, mes_facturado="SIN_FACTURAS")
+                    facturas_totales.append(registro_vacio)
 
             except Exception as e:
                 # Captura el error específico del CUPS actual pero permite que el bucle siga con el siguiente
+                error_detalle = str(e)
                 escribir_log(f"{'='*80}",mostrar_tiempo=False)
-                escribir_log(f"[ERROR] Fallo al procesar CUPS {cups_actual}. Detalles del error:")
-                escribir_log(f"{str(e)}",mostrar_tiempo=False)
+                escribir_log(f"[ERROR] Fallo al procesar CUPS {cups_actual}. Detalles del error: \n\t\t{error_detalle}")
                 escribir_log(f"{'='*80}",mostrar_tiempo=False)
+
+                registro_error = FacturaEndesaCliente(
+                    cups=cups_actual, 
+                    error_RPA=True,
+                    direccion_suministro=f"ERROR: {error_detalle[:100]}" # Guardamos parte del error
+                )
+                facturas_totales.append(registro_error)
+                
                 escribir_log(f"Continuando con el siguiente código de la lista...")
                 continue
 
