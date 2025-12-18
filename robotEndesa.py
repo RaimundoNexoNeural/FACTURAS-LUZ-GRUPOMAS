@@ -205,7 +205,7 @@ async def _extraer_pagina_actual(page: Page) -> list[FacturaEndesaCliente]:
             escribir_log(f"[FILES]")
             
             xml_save_path = await _descargar_archivo_fila(page, row, factura, 'XML')
-            await _descargar_archivo_fila(page, row, factura, 'PDF')
+            pdf_save_path = await _descargar_archivo_fila(page, row, factura, 'PDF')
            
             
             # 3. INTEGRACIÓN DEL PARSEO XML: Si el XML se descargó, lo procesamos.
@@ -215,10 +215,18 @@ async def _extraer_pagina_actual(page: Page) -> list[FacturaEndesaCliente]:
                 if not exito_xml:
                     escribir_log(f"    -> [ERROR XML] Fallo al extraer datos del XML para factura {factura.numero_factura} ({factura.cups})")
                     factura.error_RPA = True
+                    factura.direccion_suministro = "ERROR_PARSEO: El archivo XML no contenía datos válidos o estaba incompleto."
             else:
                 escribir_log(f"    -> [ADVERTENCIA XML] No se descargó el XML, omitiendo parseo para factura {factura.numero_factura} ({factura.cups})")
                 factura.error_RPA = True
+                factura.direccion_suministro = "ERROR_DESCARGA: No se pudo descargar el archivo XML del portal de Endesa."
             
+            if not pdf_save_path and not factura.error_RPA:
+                # Si el XML fue bien pero el PDF falló, avisamos pero no bloqueamos (opcional)
+                escribir_log(f"    -> [ADVERTENCIA] PDF no disponible.")
+                factura.error_RPA = True
+                factura.direccion_suministro += " | ADVERTENCIA: No se pudo descargar el archivo PDF del portal de Endesa."
+
             facturas_pagina.append(factura)
             
         except Exception as e:
