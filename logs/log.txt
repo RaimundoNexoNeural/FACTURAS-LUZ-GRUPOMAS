@@ -1,3 +1,92 @@
 [2025-12-17 19:53:39] 
 API llamada: /clear_files - Completada
 
+	[2025-12-17 23:59:30] [INFO] Carpetas de descarga configuradas en: temp_endesa_downloads
+
+[2025-12-18 00:02:45] 
+API llamada POST (Metadata): 6 CUPs, Desde=01/10/2025, Hasta=31/10/2025
+
+	 - CUPS válido: ES0031104001694001YG0F
+	 - CUPS válido: ES0031102234146002QG0F
+	 - CUPS válido: ES0031104000278001BE0F
+	 - CUPS válido: ES0031102256873001CJ0F
+	 - CUPS válido: ES0031102256955006KT0F
+	 - CUPS válido: ES0031102243323002NG0F
+
+     [INICIO] Iniciando proceso RPA para 6 CUPS. 
+ 
+	 ======================================== 
+
+	[2025-12-18 00:02:45] [LOGIN] Intento 1/5...
+	[2025-12-18 00:03:50] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:03:50] Razón: Credenciales incorrectas.
+	[2025-12-18 00:03:50] [ADVERTENCIA] Intento de login 1 fallido. Cerrando contexto.
+
+	[2025-12-18 00:03:56] [LOGIN] Intento 2/5...
+	[2025-12-18 00:04:59] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:04:59] Razón: Credenciales incorrectas.
+	[2025-12-18 00:04:59] [ADVERTENCIA] Intento de login 2 fallido. Cerrando contexto.
+
+	[2025-12-18 00:05:04] [LOGIN] Intento 3/5...
+	[2025-12-18 00:06:07] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:06:07] Razón: Credenciales incorrectas.
+	[2025-12-18 00:06:07] [ADVERTENCIA] Intento de login 3 fallido. Cerrando contexto.
+
+	[2025-12-18 00:06:12] [LOGIN] Intento 4/5...
+	[2025-12-18 00:07:15] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:07:15] Razón: Credenciales incorrectas.
+	[2025-12-18 00:07:15] [ADVERTENCIA] Intento de login 4 fallido. Cerrando contexto.
+
+	[2025-12-18 00:07:20] [LOGIN] Intento 5/5...
+	[2025-12-18 00:08:23] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:08:23] Razón: Credenciales incorrectas.
+	[2025-12-18 00:08:23] [ADVERTENCIA] Intento de login 5 fallido. Cerrando contexto.
+	[2025-12-18 00:08:23] 🛑 FALLO CRÍTICO EN EL ROBOT: Fallo crítico: No se pudo acceder al portal tras 5 intentos.
+	[2025-12-18 00:08:23] [SISTEMA] Navegador cerrado y recursos liberados.
+
+
+	[2025-12-18 00:08:23] ERROR: Fallo crítico en el proceso RPA: Fallo crítico: No se pudo acceder al portal tras 5 intentos.
+
+[2025-12-18 00:13:48] 
+API llamada POST (Metadata): 6 CUPs, Desde=01/10/2025, Hasta=31/10/2025
+
+	 - CUPS válido: ES0031104001694001YG0F
+	 - CUPS válido: ES0031102234146002QG0F
+	 - CUPS válido: ES0031104000278001BE0F
+	 - CUPS válido: ES0031102256873001CJ0F
+	 - CUPS válido: ES0031102256955006KT0F
+	 - CUPS válido: ES0031102243323002NG0F
+
+     [INICIO] Iniciando proceso RPA para 6 CUPS. 
+ 
+	 ======================================== 
+
+	[2025-12-18 00:13:48] [LOGIN] Intento 1/5...
+	[2025-12-18 00:14:51] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:14:51] Razón: Credenciales incorrectas.
+	[2025-12-18 00:14:51] [ADVERTENCIA] Intento de login 1 fallido. Cerrando contexto.
+
+	[2025-12-18 00:14:56] [LOGIN] Intento 2/5...
+	[2025-12-18 00:15:59] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:15:59] Razón: Credenciales incorrectas.
+	[2025-12-18 00:15:59] [ADVERTENCIA] Intento de login 2 fallido. Cerrando contexto.
+
+	[2025-12-18 00:16:04] [LOGIN] Intento 3/5...
+	[2025-12-18 00:17:07] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:17:07] Razón: Credenciales incorrectas.
+	[2025-12-18 00:17:07] [ADVERTENCIA] Intento de login 3 fallido. Cerrando contexto.
+
+	[2025-12-18 00:17:12] [LOGIN] Intento 4/5...
+	[2025-12-18 00:18:15] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:18:15] Razón: Credenciales incorrectas.
+	[2025-12-18 00:18:15] [ADVERTENCIA] Intento de login 4 fallido. Cerrando contexto.
+
+	[2025-12-18 00:18:20] [LOGIN] Intento 5/5...
+	[2025-12-18 00:19:23] Fallo en el Login: El tiempo de espera para cargar el indicador de éxito (cookies o dashboard) ha expirado.
+	[2025-12-18 00:19:23] Razón: Credenciales incorrectas.
+	[2025-12-18 00:19:23] [ADVERTENCIA] Intento de login 5 fallido. Cerrando contexto.
+	[2025-12-18 00:19:23] 🛑 FALLO CRÍTICO EN EL ROBOT: Fallo crítico: No se pudo acceder al portal tras 5 intentos.
+	[2025-12-18 00:19:23] [SISTEMA] Navegador cerrado y recursos liberados.
+
+
+	[2025-12-18 00:19:23] ERROR: Fallo crítico en el proceso RPA: Fallo crítico: No se pudo acceder al portal tras 5 intentos.

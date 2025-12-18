@@ -75,10 +75,10 @@ def procesar_xml_local(factura: FacturaEndesaCliente, filepath: str):
             
     except FileNotFoundError:
         escribir_log(f"    -> [ERROR XML] Archivo no encontrado en: {filepath}")
-        return
+        return False
     except Exception as e:
         escribir_log(f"     -> [ERROR XML] Error al leer el archivo (código): {e}")
-        return
+        return False
 
     # --- INICIALIZACIÓN DE VARIABLES PARA CÁLCULO ---
     total_importe_potencia = 0.0
@@ -111,8 +111,12 @@ def procesar_xml_local(factura: FacturaEndesaCliente, filepath: str):
             pass # Se mantiene como None según tu lógica original
     
     # Base Imponible: <TotalGrossAmountBeforeTaxes>
-    factura.importe_base_imponible = _extract_simple_value(content, 'TotalGrossAmountBeforeTaxes', is_float=True)
-    
+    base_imponible = _extract_simple_value(content, 'TotalGrossAmountBeforeTaxes', is_float=True)
+    if base_imponible == 0.0:
+        escribir_log(f"    -> [ERROR XML] Datos críticos no encontrados en XML para {factura.cups}")
+        return False
+    factura.importe_base_imponible = base_imponible
+
     # Totales Finales
     factura.importe_facturado = _extract_simple_value(content, 'InvoiceTotal', is_float=True)
     factura.importe_total_final = _extract_simple_value(content, 'InstallmentAmount', is_float=True)
@@ -201,5 +205,8 @@ def procesar_xml_local(factura: FacturaEndesaCliente, filepath: str):
         # Si falla el parseo, se queda en None o 0 (ya que es un int)
         pass
 
+    if factura.tarifa == 'N/A' or factura.importe_base_imponible is None:
+        return False
 
     escribir_log(f"    -> [OK] [XML PARSED] Datos extraídos del XML para factura {factura.numero_factura} ({factura.cups})")
+    return True

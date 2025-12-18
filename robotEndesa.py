@@ -211,7 +211,13 @@ async def _extraer_pagina_actual(page: Page) -> list[FacturaEndesaCliente]:
             # 3. INTEGRACIÓN DEL PARSEO XML: Si el XML se descargó, lo procesamos.
             if xml_save_path:
                 escribir_log(f"[XML PROCESSING]")
-                procesar_xml_local(factura, xml_save_path)
+                exito_xml = procesar_xml_local(factura, xml_save_path)
+                if not exito_xml:
+                    escribir_log(f"    -> [ERROR XML] Fallo al extraer datos del XML para factura {factura.numero_factura} ({factura.cups})")
+                    factura.error_RPA = True
+            else:
+                escribir_log(f"    -> [ADVERTENCIA XML] No se descargó el XML, omitiendo parseo para factura {factura.numero_factura} ({factura.cups})")
+                factura.error_RPA = True
             
             facturas_pagina.append(factura)
             
@@ -227,8 +233,10 @@ async def leer_tabla_facturas(page: Page) -> list[FacturaEndesaCliente]:
     page_num = 1
     
     tabla_selector = 'div.style-table.contenedorGeneral table#example1'
-    await page.wait_for_selector(tabla_selector, timeout=30000)
-    
+    try:
+        await page.wait_for_selector(tabla_selector, timeout=30000)
+    except TimeoutError:
+        raise Exception("TABLA_NO_CARGADA: El portal no mostró la tabla de facturas.")
     
     next_button_selector = 'button.pagination-flex-siguiente'
     
@@ -408,7 +416,7 @@ async def ejecutar_robot_api(lista_cups: list, fecha_desde: str, fecha_hasta: st
                     escribir_log(f"{'='*80}",mostrar_tiempo=False)
                     escribir_log(f"[INFO] No se encontraron facturas registradas para {cups_actual} en este rango.")
                     escribir_log(f"{'='*80}",mostrar_tiempo=False)
-                    registro_vacio = FacturaEndesaCliente(cups=cups_actual, error_RPA=False, mes_facturado="SIN_FACTURAS")
+                    registro_vacio = FacturaEndesaCliente(cups=cups_actual, error_RPA=False, mes_facturado="SIN_FACTURAS",numero_factura="N/A")
                     facturas_totales.append(registro_vacio)
 
             except Exception as e:
@@ -424,7 +432,7 @@ async def ejecutar_robot_api(lista_cups: list, fecha_desde: str, fecha_hasta: st
                     direccion_suministro=f"ERROR: {error_detalle[:100]}" # Guardamos parte del error
                 )
                 facturas_totales.append(registro_error)
-                
+
                 escribir_log(f"Continuando con el siguiente código de la lista...")
                 continue
 
