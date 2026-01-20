@@ -2,6 +2,7 @@ import os
 import json
 from logs import escribir_log
 from openai import OpenAI
+from datetime import datetime
 from modelos_datos import FacturaEndesaCliente
 
 def procesar_pdf_local(factura_obj: FacturaEndesaCliente, ruta_pdf: str) -> bool:
@@ -90,6 +91,27 @@ def procesar_pdf_local(factura_obj: FacturaEndesaCliente, ruta_pdf: str) -> bool
                     # Opcional: Aquí podrías decidir si sobreescribir o no. 
                     # Por ahora, mantenemos el valor del objeto y solo avisamos.
                     pass
+        
+        # --- NUEVA LÓGICA: ACTUALIZACIÓN DEL MES FACTURADO ---
+        if factura_obj.fecha_fin_periodo and factura_obj.fecha_fin_periodo != "N/A":
+            try:
+                nombres_meses = {
+                    1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL",
+                    5: "MAYO", 6: "JUNIO", 7: "JULIO", 8: "AGOSTO",
+                    9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"
+                }
+                
+                # Normalizamos formatos de fecha (DD-MM-YYYY o DD/MM/YYYY)
+                f_fin_str = factura_obj.fecha_fin_periodo.replace("/", "-")
+                dt_fin = datetime.strptime(f_fin_str, '%d-%m-%Y')
+                
+                # Asignar nombre del mes basado en la fecha de fin de periodo
+                factura_obj.mes_facturado = nombres_meses.get(dt_fin.month, "DESCONOCIDO")
+                # escribir_log(f"\t-> [INFO] Mes facturado asignado: {factura_obj.mes_facturado}")
+                
+            except Exception as e_fecha:
+                escribir_log(f"[ERROR] No se pudo procesar la fecha para el mes facturado: {e_fecha}")
+        # -----------------------------------------------------
         
         return True
 
