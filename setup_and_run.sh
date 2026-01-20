@@ -11,22 +11,22 @@ UVICORN_PORT="9999"
 PYTHON_BIN="python3"
 
 echo "======================================================="
-echo " 🚀 CONFIGURACIÓN COMPLETA Y ARRANQUE DE LA API 🚀 "
+echo " CONFIGURACIÓN COMPLETA Y ARRANQUE DE LA API "
 echo "======================================================="
 
 # --- NUEVO: CARGAR VARIABLES DESDE EL ARCHIVO .env ---
 if [ -f .env ]; then
-    echo " 📂 Cargando variables desde el archivo .env..."
+    echo " Cargando variables desde el archivo .env..."
     # Exporta las variables ignorando comentarios y líneas vacías
     export $(grep -v '^#' .env | xargs)
 else
-    echo " ⚠️ ADVERTENCIA: No se encontró el archivo .env"
+    echo " ADVERTENCIA: No se encontró el archivo .env"
 fi
 # -----------------------------------------------------
 
 # 1. Validación de Credenciales
 if [ -z "$ENDESA_USER" ] || [ -z "$ENDESA_PASSWORD" ]; then
-    echo " ❌ ERROR: Credenciales no detectadas. Abortando."
+    echo " ERROR: Credenciales no detectadas. Abortando."
     exit 1
 fi
 
@@ -78,7 +78,7 @@ disown $NEW_PID
 
 
 echo "======================================================="
-echo " ✅ PROCESO FINALIZADO CON ÉXITO "
+echo " PROCESO FINALIZADO CON ÉXITO "
 echo " PID ACTUAL: $NEW_PID"
 echo " URL: http://93.93.64.20:9999/docs"
 echo "======================================================="
