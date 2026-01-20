@@ -17,8 +17,8 @@ URL_LOGIN = "https://endesa-atenea.my.site.com/miempresa/s/login/?language=es"
 URL_BUSQUEDA_FACTURAS = "https://endesa-atenea.my.site.com/miempresa/s/asistente-busqueda?tab=f"
 
 # Credenciales REALES proporcionadas por el usuario
-USER = os.environ.get("ENDESA_USER", "pfombellav@somosgrupomas.com")
-PASSWORD = os.environ.get("ENDESA_PASSWORD", "Guillena2024*")
+USER = os.environ.get("ENDESA_USER", "no_user")
+PASSWORD = os.environ.get("ENDESA_PASSWORD", "no_password")
 
 GRUPO_EMPRESARIAL = "GRUPO HERMANOS MARTIN" # Constante para el filtro siempre aplicado
 

@@ -24,7 +24,7 @@ class NavegadorAsync:
         self.playwright = await async_playwright().start()
         
         # Mantenemos headless=True para el servidor
-        self.browser = await self.playwright.chromium.launch(headless=False) 
+        self.browser = await self.playwright.chromium.launch(headless=True) 
         
         # --- CAMBIOS PARA EVITAR BLOQUEOS Y MEJORAR ESTABILIDAD ---
         self.context = await self.browser.new_context(
