@@ -12,9 +12,10 @@ from logs import escribir_log
 RE_FLAG = re.DOTALL
 
 def _clean_text(text: str) -> str:
-    """Limpia el texto, eliminando los prefijos de Namespace para simplificar el Regex."""
-    # Reemplaza nsX:Tag con Tag. Este paso es crucial para la robustez del Regex.
-    return re.sub(r'</?\w+:', '<', text)
+    """Limpia el texto, eliminando los prefijos de Namespace de las etiquetas XML."""
+    # Busca patrones como <ns0:Tag o </ns0:Tag y los deja como <Tag o </Tag
+    text = re.sub(r'<([/]?)\w+:', r'<\1', text)
+    return text
 
 def _extract_simple_value(file_content: str, tag_name: str, is_float: bool = False, is_date: bool = False, default=None):
     """Extrae la primera ocurrencia de un valor basado en su etiqueta (ignorando Namespaces)."""
@@ -35,26 +36,22 @@ def _extract_simple_value(file_content: str, tag_name: str, is_float: bool = Fal
     return default if default is not None else (0.0 if is_float else None)
 
 def _extract_cost_by_description(file_content: str, item_description: str) -> float:
-    """
-    Busca una ItemDescription específica dentro del XML y captura el TotalCost inmediatamente
-    después dentro del mismo bloque InvoiceLine.
-    """
-    # Patrón: <ItemDescription>DESCRIPCION</ItemDescription>.*?<TotalCost>VALOR</TotalCost>
     pattern = (
         r"<ItemDescription>\s*" + re.escape(item_description) + r"\s*</ItemDescription>"
-        r"[\s\S]*?<TotalCost>([0-9.]+)</TotalCost>"
+        r"[\s\S]*?<TotalCost>([\d.,]+)</TotalCost>" # Acepta coma y punto
     )
     
     match = re.search(pattern, file_content, re.DOTALL | re.IGNORECASE)
     
     if match:
-        cost_str = match.group(1).strip()
+        cost_str = match.group(1).strip().replace(',', '.') # Normaliza coma a punto
         try:
             return float(cost_str)
         except ValueError:
             return 0.0
-            
     return 0.0
+
+
 
 
 # --------------------------------------------------------------------------------
@@ -82,14 +79,20 @@ def procesar_xml_local(factura: FacturaEndesaCliente, filepath: str):
 
     # --- INICIALIZACIÓN DE VARIABLES PARA CÁLCULO ---
     total_importe_potencia = 0.0
-    total_kw_consumo = 0.0
     total_importe_consumo = 0.0
     total_exceso_potencia = 0.0
     
     # --- 2. EXTRACCIÓN DE DATOS DE CABECERA Y GENERALES ---
     
     factura.tarifa = _extract_simple_value(content, 'CodigoTarifa', default='N/A')
-    factura.direccion_suministro = _extract_simple_value(content, 'Direccion', default='N/A')
+    # --- EXTRACCIÓN DETALLADA DE DIRECCIÓN DE SUMINISTRO ---
+    dir_calle = _extract_simple_value(content, 'Direccion', default='')
+    dir_cp = _extract_simple_value(content, 'CodigoPostal', default='')
+    dir_pob = _extract_simple_value(content, 'Poblacion', default='')
+    dir_prov = _extract_simple_value(content, 'Provincia', default='')
+
+    # Concatenamos siguiendo el formato: Calle, CP Poblacion, Provincia
+    factura.direccion_suministro = f"{dir_calle}, {dir_cp} {dir_pob}, {dir_prov}".strip(", ")
     
    # Mes Facturado (de TransactionDate) convertido a NOMBRE EN MAYÚSCULAS
     transaction_date = _extract_simple_value(content, 'TransactionDate')
@@ -120,8 +123,14 @@ def procesar_xml_local(factura: FacturaEndesaCliente, filepath: str):
     # Totales Finales
     factura.importe_facturado = _extract_simple_value(content, 'InvoiceTotal', is_float=True)
     factura.importe_total_final = _extract_simple_value(content, 'InstallmentAmount', is_float=True)
-    factura.fecha_de_cobro_en_banco = _extract_simple_value(content, 'InstallmentDueDate', default='')
     
+    # Extracción segura de la fecha de cobro
+    fecha_cobro_raw = _extract_simple_value(content, 'InstallmentDueDate')
+    if fecha_cobro_raw:
+        try:
+            factura.fecha_de_cobro_en_banco = datetime.strptime(fecha_cobro_raw, '%Y-%m-%d').strftime('%d/%m/%Y')
+        except ValueError:
+            factura.fecha_de_cobro_en_banco = None
     # --- 3. EXTRACCIÓN Y CÁLCULO DE COSTES DETALLADOS (TotalCost por descripción) ---
     
     # A. Potencia (Pot. Px)
@@ -188,6 +197,7 @@ def procesar_xml_local(factura: FacturaEndesaCliente, filepath: str):
         else:
             setattr(factura, attr, 0.0) 
             
+    
     factura.kw_totales = round(total_kw, 2)
     
     # Días (Extraído del alquiler del contador)

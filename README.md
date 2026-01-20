@@ -18,6 +18,7 @@ DESCARGA FACTURAS MAS/
 ├── navegador.py          # Clase para manejar el navegador con Playwright
 ├── robotEndesa.py        # Lógica principal del robot RPA
 ├── xml_parser.py         # Procesamiento de archivos XML
+├── pdf_parser.py         # Procesamiento de archivos PDF mediante OCR de OpenAI
 ├── temp_endesa_downloads/
 │   ├── Facturas_Endesa_HTMLs/ # Archivos HTML descargados
 │   ├── Facturas_Endesa_PDFs/  # Archivos PDF descargados
@@ -44,12 +45,16 @@ DESCARGA FACTURAS MAS/
 4. **Procesamiento de Archivos XML**:
    - Extracción de datos detallados como potencia, consumo, impuestos, etc.
 
+5. **Procesamiento de Archivos PDF**:
+   - Extracción de datos detallados como potencia, consumo, impuestos, etc. Mediante OCR de OpenAI
+
 ## Requisitos del Sistema
 
 - Python 3.9 o superior
 - Playwright
 - FastAPI
 - Pydantic
+- OpenAi
 
 ## Instalación y Configuración
 

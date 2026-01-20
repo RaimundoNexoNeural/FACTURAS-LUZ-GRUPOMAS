@@ -6,8 +6,9 @@ import base64 # Necesario para la codificación Base64
 import os # Necesario para manejar rutas de archivos
 from playwright.async_api import Page, TimeoutError, Locator # Importamos Page, TimeoutError, Locator
 from modelos_datos import FacturaEndesaCliente # Importamos la clase modelo de datos (AHORA ES PYDANTIC)
-# IMPORTACIÓN DEL PARSER XML
+# IMPORTACIÓN DEL PARSER de documentos
 from xml_parser import procesar_xml_local
+from pdf_parser import procesar_pdf_local
 # IMPORTACIÓN DE LA FUNCIÓN DE LOGGING
 from logs import escribir_log
 
@@ -16,8 +17,8 @@ URL_LOGIN = "https://endesa-atenea.my.site.com/miempresa/s/login/?language=es"
 URL_BUSQUEDA_FACTURAS = "https://endesa-atenea.my.site.com/miempresa/s/asistente-busqueda?tab=f"
 
 # Credenciales REALES proporcionadas por el usuario
-USER = os.environ.get("ENDESA_USER", "sin_usuario")
-PASSWORD = os.environ.get("ENDESA_PASSWORD", "sin_contraseña")
+USER = os.environ.get("ENDESA_USER", "pfombellav@somosgrupomas.com")
+PASSWORD = os.environ.get("ENDESA_PASSWORD", "Guillena2024*")
 
 GRUPO_EMPRESARIAL = "GRUPO HERMANOS MARTIN" # Constante para el filtro siempre aplicado
 
@@ -206,7 +207,6 @@ async def _extraer_pagina_actual(page: Page) -> list[FacturaEndesaCliente]:
             
             xml_save_path = await _descargar_archivo_fila(page, row, factura, 'XML')
             pdf_save_path = await _descargar_archivo_fila(page, row, factura, 'PDF')
-           
             
             # 3. INTEGRACIÓN DEL PARSEO XML: Si el XML se descargó, lo procesamos.
             if xml_save_path:
@@ -218,14 +218,19 @@ async def _extraer_pagina_actual(page: Page) -> list[FacturaEndesaCliente]:
                     factura.direccion_suministro = "ERROR_PARSEO: El archivo XML no contenía datos válidos o estaba incompleto."
             else:
                 escribir_log(f"    -> [ADVERTENCIA XML] No se descargó el XML, omitiendo parseo para factura {factura.numero_factura} ({factura.cups})")
+
+            if not xml_save_path and pdf_save_path:
+                
+                escribir_log(f"[PDF OCR]")
+                exito_pdf = procesar_pdf_local(factura, pdf_save_path)
+                if not exito_pdf:
+                    escribir_log(f"    -> [ERROR PDF] Fallo al extraer datos del PDF para factura {factura.numero_factura} ({factura.cups})")
+                    factura.error_RPA = True
+                    factura.direccion_suministro += "ERROR_PARSEO: El archivo PDF no contenía datos válidos o estaba incompleto."
+            else:
                 factura.error_RPA = True
-                factura.direccion_suministro = "ERROR_DESCARGA: No se pudo descargar el archivo XML del portal de Endesa."
+                factura.direccion_suministro = "ERROR_DESCARGA: No se pudo descargar ningún archivo (XML/PDF) para esta factura."
             
-            if not pdf_save_path and not factura.error_RPA:
-                # Si el XML fue bien pero el PDF falló, avisamos pero no bloqueamos (opcional)
-                escribir_log(f"    -> [ADVERTENCIA] PDF no disponible.")
-                factura.error_RPA = True
-                factura.direccion_suministro += " | ADVERTENCIA: No se pudo descargar el archivo PDF del portal de Endesa."
 
             facturas_pagina.append(factura)
             

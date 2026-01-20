@@ -1,3 +1,10 @@
+import asyncio
+import sys
+
+# Esto soluciona el NotImplementedError en Windows con Python 3.10
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from fastapi import FastAPI, HTTPException, Query
 from typing import List, Dict, Any
 from pydantic import BaseModel
@@ -11,6 +18,7 @@ import re
 import os # Necesario para manejar FileNotFoundError
 import shutil
 from logs import escribir_log
+
 
 # Inicializar la aplicación de FastAPI
 app = FastAPI(
